@@ -19,17 +19,15 @@ const UserSchema = new mongoose.Schema({
     }
 })
 
-UserSchema.pre('save', async function(next) {
+UserSchema.pre('save', async function() {
     // Only hash the password if it has been modified (or is new)
-    if (!this.isModified('passwordHash')) return next();
-
+    if (!this.isModified('passwordHash')) return;
     try {
         const salt = await bcrypt.genSalt(10);
         this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-        next();
     } catch (err) {
         console.error("Error hashing password:", err);
-        next(err);
+        throw err;
     }
 });
 

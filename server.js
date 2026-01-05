@@ -12,7 +12,7 @@ mongoose.connect(process.env.DB_CONNECT)
 .then(() => console.log("MongoDB conectado"))
 .catch(err => console.log(err));
 
-const messageRoutes = require("./routes/messages");
-app.use("/messages", messageRoutes);
+const router = require("./router");
+app.use(router)
 
 app.listen(3001, () => console.log("Servidor rodando"));
