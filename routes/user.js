@@ -51,28 +51,6 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
     }
 });
 
-router.get("/", async (req, res) => {
-    try {
-        const email = req.query.email;
-        const username = req.query.username;
-        let query = {};
-        if (email) {
-            query.email = email;
-        }
-        if (username) {
-            query.username = username;
-        }
-        console.log(query);
-        const users = await User.find(query).select("-passwordHash");
-        if (users.length === 0) {
-            return res.json({ message: "ok" });
-        }
-        res.json(users);
-    } catch (error) {
-        res.status(500).json({ message: "Erro na verificaçao de usuarios", error: error.message });
-    }
-});
-
 
 router.post("/login", async (req, res) => {
     const { username, password } = req.body;
@@ -160,7 +138,41 @@ router.patch("/:id/avatar", jwt.validateToken, upload.single("avatar"), async (r
     } catch (error) {
         res.status(500).json({ message: "Error updating avatar", error: error.message });
     }
-}
-)
+})
+
+
+router.get("/", async (req, res) => {
+    try {
+        const email = req.query.email;
+        const username = req.query.username;
+        let query = {};
+        if (email) {
+            query.email = email;
+        }
+        if (username) {
+            query.username = username;
+        }
+        console.log(query);
+        const users = await User.find(query).select("-passwordHash");
+        if (users.length === 0) {
+            return res.json({ message: "ok" });
+        }
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: "Erro na verificaçao de usuarios", error: error.message });
+    }
+});
+
+router.get("/private", jwt.validateToken, async (req, res) => {
+    try {
+        const _id = req.query._id;
+        console.log(_id);
+        const users = await User.findOne({ _id }).select("-passwordHash");
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: "Erro na verificaçao de usuarios", error: error.message });
+    }
+});
+
 
 module.exports = router;
