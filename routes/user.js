@@ -8,24 +8,71 @@ const streamifier = require("streamifier");
 const router = express.Router();
 
 
-router.post("/register", async (req, res) => {
+router.post("/register", upload.single("avatar"), async (req, res) => {
     try {
-        const passwordHash = req.body.password;
-        req.body.passwordHash = passwordHash;
-        delete req.body.password;
+        let avatarUrl = null;
 
-        const user = new User(req.body);
+        if (req.file) {
+            const streamUpload = () => {
+                return new Promise((resolve, reject) => {
+                    const stream = cloudinary.uploader.upload_stream(
+                        {
+                            folder: "profile_avatars",
+                            public_id: `avatar_${req.body.username}`,
+                        },
+                        (error, result) => {
+                            if (result) resolve(result);
+                            else reject(error);
+                        }
+                    );
+
+                    streamifier.createReadStream(req.file.buffer).pipe(stream);
+                });
+            };
+            const result = await streamUpload();
+            avatarUrl = result.secure_url;
+        }
+
+        const passwordHash = req.body.password;
+        const userData = { ...req.body, passwordHash, avatarUrl };
+        delete userData.password;
+
+        const user = new User(userData);
         await user.save();
 
         const userResponse = user.toObject();
         delete userResponse.passwordHash;
 
         userResponse.token = user.generateAuthToken();
+
         res.status(201).json(userResponse);
     } catch (error) {
         res.status(500).json({ message: "Error registering user", error: error.message });
     }
-})
+});
+
+router.get("/", async (req, res) => {
+    try {
+        const email = req.query.email;
+        const username = req.query.username;
+        let query = {};
+        if (email) {
+            query.email = email;
+        }
+        if (username) {
+            query.username = username;
+        }
+        console.log(query);
+        const users = await User.find(query).select("-passwordHash");
+        if (users.length === 0) {
+            return res.json({ message: "ok" });
+        }
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: "Erro na verificaçao de usuarios", error: error.message });
+    }
+});
+
 
 router.post("/login", async (req, res) => {
     const { username, password } = req.body;
