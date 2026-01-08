@@ -14,13 +14,27 @@ router.get("/", jwt.validateToken, async (req, res) => {
 
         const otherParticipantIds = conversations.map(conversation => {
             return conversation.participants.find(participantId => participantId.toString() !== req.query.userId);
-        });        
+        });
 
-        
+        const otherParticipants = await mongoose.model('User').find({
+            _id: { $in: otherParticipantIds }
+        }).select('name username avatarUrl status');
 
+        const participantsMap = new Map(
+            otherParticipants.map(p => [p._id.toString(), p])
+        );
 
+        const formattedConversations = conversations.map(conversation => {
+            const otherId = conversation.participants.find(p => p.toString() !== req.query.userId).toString();
+            const otherParticipantProfile = participantsMap.get(otherId);
 
-        res.json(conversations);
+            return {
+                ...conversation.toObject(), 
+                otherParticipant: otherParticipantProfile 
+            };
+        });
+
+        res.json(formattedConversations);
     } catch (error) {
         res.status(500).json({ message: "Error fetching conversations", error: error.message });
     }

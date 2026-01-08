@@ -8,8 +8,9 @@ const Conversation = require("../models/conversations");
 const router = express.Router();
 
 
-router.get("/", async (req, res) => {
-    const messages = await Message.find().sort({ createdAt: 1 });
+router.get("/", jwt.validateToken, async (req, res) => {
+    const conversationId = req.query.conversationId;
+    const messages = await Message.find({ conversationId }).sort({ createdAt: 1 });
     res.json(messages);
 });
 
