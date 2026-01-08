@@ -53,24 +53,28 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
 
 
 router.post("/login", async (req, res) => {
-    const { username, password } = req.body;
-    const user = await User.findOne({ username });
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
 
-    if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
+        if (!user) {
+            return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        const isMatch = await user.comparePassword(password);
+
+        if (!isMatch) {
+            return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        const userResponse = user.toObject();
+        delete userResponse.passwordHash;
+        userResponse.token = user.generateAuthToken();
+
+        res.json(userResponse);
+    } catch (error) {
+        res.status(500).json({ message: "Error logging in", error: error.message });
     }
-
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-        return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const userResponse = user.toObject();
-    delete userResponse.passwordHash;
-    userResponse.token = user.generateAuthToken();
-
-    res.json(userResponse);
 })
 
 router.patch("/:id", jwt.validateToken, async (req, res) => {
