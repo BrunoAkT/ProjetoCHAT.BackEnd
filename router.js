@@ -5,7 +5,7 @@ const conversationRoutes = require("./routes/conversations");
 const { Router } = require("express"); 
 const router = Router();
 
-router.use("/messages", messageRoutes);
+router.use("/messages", messageRoutes.router);
 router.use("/user", userRoutes);
 router.use("/conversations", conversationRoutes);   
 

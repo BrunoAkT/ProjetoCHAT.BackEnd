@@ -4,65 +4,91 @@ const Message = require("../models/message");
 const jwt = require('../token');
 const Conversation = require("../models/conversations");
 
-
 const router = express.Router();
 
-
 router.get("/", jwt.validateToken, async (req, res) => {
-    const conversationId = req.query.conversationId;
-    const messages = await Message.find({ conversationId }).sort({ createdAt: 1 });
+    const messages = [];
+    
+    if (!req.query.conversationId) {
+        const userId = req.query.userId;
+        const friendId = req.query.friendId;
+
+        messages.push(...await Message.find({
+            $or: [
+                { senderId: userId, readBy: friendId },
+                { senderId: friendId, readBy: userId }
+            ]
+        }).sort({ createdAt: 1 }));
+
+    } else {
+        const conversationId = req.query.conversationId;
+        messages.push(...await Message.find({ conversationId }).sort({ createdAt: 1 }));
+    }
+
     res.json(messages);
 });
 
-
-router.post("/", jwt.validateToken, async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-        const conversationId = req.body.conversationId;
-        const conversation = await Conversation.findById(conversationId).session(session);
-
-        if (!conversation) {
-            const newConversation = new Conversation({
-                participants: [req.body.senderId, req.body.receiverId],
-                lastMessage: {
-                    text: req.body.text,
-                    senderId: req.body.senderId,
-                    createdAt: new Date()
-                }
-            });
-            await newConversation.save({ session });
-            req.body.conversationId = newConversation._id;
-        } else {
-            conversation.lastMessage = {
-                text: req.body.text,
-                senderId: req.body.senderId,
-                createdAt: new Date()
-            };
-            await conversation.save({ session });
+const handleSocketEvents = (socket, io) => {
+    socket.on('sendMessage', async (data) => {
+        const decodedToken = jwt.validateTokenForSocket(data.token);
+        if (!decodedToken) {
+            socket.emit('auth_error', { message: 'Token inválido ou não fornecido.' });
+            return;
+        }
+        if (decodedToken.id !== data.senderId) {
+            socket.emit('auth_error', { message: 'Token não corresponde ao remetente.' });
+            return;
         }
 
-        const message = new Message({
-            conversationId: req.body.conversationId,
-            senderId: req.body.senderId,
-            type: req.body.type,
-            text: req.body.text,
-            fileUrl: req.body.fileUrl,
-            readBy: [req.body.receiverId]
-        });
-        await message.save({ session });
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            let conversationId = data.conversationId;
+            if (!conversationId) {
+                const newConversation = new Conversation({
+                    participants: [data.senderId, data.receiverId],
+                    lastMessage: {
+                        text: data.text,
+                        senderId: data.senderId,
+                        createdAt: new Date()
+                    }
+                });
+                const savedConversation = await newConversation.save({ session });
+                conversationId = savedConversation._id;
+            } else {
+                const conversation = await Conversation.findById(conversationId).session(session);
+                if (conversation) {
+                    conversation.lastMessage = {
+                        text: data.text,
+                        senderId: data.senderId,
+                        createdAt: new Date()
+                    };
+                    await conversation.save({ session });
+                }
+            }
 
-        await session.commitTransaction();
-        res.json(message);
+            const message = new Message({
+                conversationId: conversationId,
+                senderId: data.senderId,
+                type: data.type,
+                text: data.text,
+                fileUrl: data.fileUrl,
+                readBy: [data.receiverId]
+            });
+            const savedMessage = await message.save({ session });
 
-    } catch (error) {
-        await session.abortTransaction();
-        res.status(500).json({ error: "Transaction failed", details: error.message });
-    } finally {
-        session.endSession();
-    }
-});
+            await session.commitTransaction();
 
+            io.to(data.senderId).to(data.receiverId).emit('receiveMessage', savedMessage);
 
-module.exports = router;
+        } catch (error) {
+            await session.abortTransaction();
+            console.error("Erro ao enviar mensagem:", error);
+        } finally {
+            session.endSession();
+        }
+    });
+};
+
+module.exports = { router, handleSocketEvents };
+

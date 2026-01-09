@@ -22,4 +22,14 @@ function validateToken(req, res, next) {
     })
 }
 
-module.exports = { generateToken, validateToken }
+function validateTokenForSocket(token) {
+    try {
+        const [bearer, actualToken] = token.split(" ");
+        return jwt.verify(actualToken, secretToken);
+    } catch (err) {
+        console.error("Erro na validação do token para socket:", err.message);
+        return null;
+    }
+}
+
+module.exports = { generateToken, validateToken, validateTokenForSocket }
