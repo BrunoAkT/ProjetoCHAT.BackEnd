@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.get("/", jwt.validateToken, async (req, res) => {
     const messages = [];
-    
+
     if (!req.query.conversationId) {
         const userId = req.query.userId;
         const friendId = req.query.friendId;
@@ -80,6 +80,9 @@ const handleSocketEvents = (socket, io) => {
             await session.commitTransaction();
 
             io.to(data.senderId).to(data.receiverId).emit('receiveMessage', savedMessage);
+
+            io.to(data.senderId).emit('conversationUpdated');
+            io.to(data.receiverId).emit('conversationUpdated');
 
         } catch (error) {
             await session.abortTransaction();

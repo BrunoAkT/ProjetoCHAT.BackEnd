@@ -1,19 +1,27 @@
 const messageHandler = require('../routes/messages');
+const userHandler = require('../routes/user');
+const User = require('../models/user');
 
 function initializeSocket(io) {
-    io.on("connection", (socket) => {
-        console.log(`Usuário conectado: ${socket.id}`);
+    io.on("connection", async (socket) => {
+        const userId = socket.handshake.query.userId;
+        if (userId) {
+            try {
+                await User.findByIdAndUpdate(userId, { $set: { status: 'online'} });
+                io.emit('userStatusChanged', { userId, status: 'online' });
+            } catch (error) {
+                console.error("Error updating user status to online:", error);
+            }
+        }
 
-        // Junta o usuário a uma sala com seu próprio ID
         socket.on('join', (userId) => {
             socket.join(userId);
-            console.log(`Usuário com ID ${userId} entrou na sua sala.`);
         });
 
-        // Delega os eventos de mensagem para o handler de mensagens
         messageHandler.handleSocketEvents(socket, io);
+        userHandler.handleSocketEvents(socket, io);
 
-        socket.on("disconnect", () => {
+        socket.on("disconnect", async () => {
             console.log(`Usuário desconectado: ${socket.id}`);
         });
     });

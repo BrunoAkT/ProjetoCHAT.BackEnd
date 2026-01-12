@@ -170,7 +170,7 @@ router.get("/", async (req, res) => {
 router.get("/private", jwt.validateToken, async (req, res) => {
     try {
         const _id = req.query._id;
-        console.log(_id);
+        // console.log(_id);
         const users = await User.findOne({ _id }).select("-passwordHash");
         res.json(users);
     } catch (error) {
@@ -178,5 +178,43 @@ router.get("/private", jwt.validateToken, async (req, res) => {
     }
 });
 
+const handleSocketEvents = (socket, io) => {
+    socket.on('updateUserStatus', async (data) => {
+        try {
+            const { userId, status } = data;
+            if (!userId) return;
 
-module.exports = router;
+            const user = await User.findByIdAndUpdate(userId, { $set: { status: status } }, { new: true });
+            if (user) {
+                io.emit('userStatusChanged', { userId: user._id, status: user.status });
+            }
+        } catch (error) {
+            console.error("Error updating user status:", error);
+        }
+    });
+
+    socket.on('disconnect', async () => {
+        try {
+            userId = socket.handshake.query.userId;
+            if (!userId) return;
+
+            setTimeout(async () => {
+                const user = await User.findOneAndUpdate(
+                    { _id: userId },
+                    { $set: { status: 'offline' } },
+                    { new: true }
+                );
+
+                if (user) {
+                    io.emit('userStatusChanged', { userId: user._id, status: 'offline' });
+                }
+            }, 5000);
+
+        } catch (error) {
+            console.error("Error on disconnect:", error);
+        }
+    });
+};
+
+
+module.exports = { router, handleSocketEvents };
