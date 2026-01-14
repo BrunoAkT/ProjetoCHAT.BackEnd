@@ -7,7 +7,10 @@ function initializeSocket(io) {
         const userId = socket.handshake.query.userId;
         if (userId) {
             try {
-                await User.findByIdAndUpdate(userId, { $set: { status: 'online'} });
+                const user = await User.findByIdAndUpdate(userId, { $set: { status: 'online'} });
+                if (user){
+                    console.log(`User ${userId} set to online, username: ${user.username}`);
+                }
                 io.emit('userStatusChanged', { userId, status: 'online' });
             } catch (error) {
                 console.error("Error updating user status to online:", error);

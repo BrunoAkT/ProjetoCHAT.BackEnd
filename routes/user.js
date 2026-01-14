@@ -180,6 +180,8 @@ router.get("/private", jwt.validateToken, async (req, res) => {
 
 const handleSocketEvents = (socket, io) => {
     socket.on('updateUserStatus', async (data) => {
+        console.log(`User ${userId} status updated to ${status}`);
+
         try {
             const { userId, status } = data;
             if (!userId) return;
@@ -195,7 +197,7 @@ const handleSocketEvents = (socket, io) => {
 
     socket.on('disconnect', async () => {
         try {
-            userId = socket.handshake.query.userId;
+            const userId = socket.handshake.query.userId;
             if (!userId) return;
 
             setTimeout(async () => {
@@ -208,7 +210,7 @@ const handleSocketEvents = (socket, io) => {
                 if (user) {
                     io.emit('userStatusChanged', { userId: user._id, status: 'offline' });
                 }
-            }, 5000);
+            }, 3000);
 
         } catch (error) {
             console.error("Error on disconnect:", error);
