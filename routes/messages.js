@@ -91,6 +91,17 @@ const handleSocketEvents = (socket, io) => {
             session.endSession();
         }
     });
+
+    socket.on('typing', ({ conversationId }) => {
+        console.log(`User typing in conversation ${conversationId}`);
+        socket.broadcast.emit("typing", { conversationId });
+    });
+
+    socket.on('stopTyping', ({ conversationId }) => {
+        console.log(`User stopped typing in conversation ${conversationId}`);
+        socket.broadcast.emit("stopTyping", { conversationId });
+    });
+
 };
 
 module.exports = { router, handleSocketEvents };
